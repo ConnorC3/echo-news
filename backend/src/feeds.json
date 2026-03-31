@@ -1,0 +1,127 @@
+[
+    {
+        "url": "https://feeds.bbci.co.uk/news/world/rss.xml",
+        "category": "world",
+        "active": true
+    },
+    {
+        "url": "https://hnrss.org/frontpage",
+        "category": "technology",
+        "active": true
+    },
+    {
+        "url": "https://feeds.arstechnica.com/arstechnica/index",
+        "category": "technology",
+        "active": true
+    },
+    {
+        "url": "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
+        "category": "world",
+        "active": true
+    },
+    {
+        "url": "https://github.blog/feed/",
+        "category": "technology",
+        "active": true
+    },
+    {
+        "url": "https://www.theverge.com/rss/index.xml",
+        "category": "technology",
+        "active": true
+    },
+    {
+        "url": "https://aws.amazon.com/blogs/aws/feed/",
+        "category": "technology",
+        "active": true
+    },
+    {
+        "url": "https://www.wired.com/feed/rss",
+        "category": "technology",
+        "active": true
+    },
+    {
+        "url": "https://stackoverflow.blog/feed/",
+        "category": "technology",
+        "active": true
+    },
+    {
+        "url": "https://blog.cloudflare.com/rss/",
+        "category": "technology",
+        "active": true
+    },
+    {
+        "url": "https://www.ft.com/rss/home/international",
+        "category": "economy",
+        "active": true
+    },
+    {
+        "url": "https://techcrunch.com/feed/",
+        "category": "technology",
+        "active": true
+    },
+    {
+        "url": "https://feeds.npr.org/1001/rss.xml",
+        "category": "world",
+        "active": true
+    },
+    {
+        "url": "https://news.ycombinator.com/rss",
+        "category": "technology",
+        "active": true
+    },
+    {
+        "url": "https://www.nasa.gov/news-release/feed/",
+        "category": "science",
+        "active": true
+    },
+    {
+        "url": "https://www.nature.com/nature.rss",
+        "category": "science",
+        "active": true
+    },
+    {
+        "url": "https://finance.yahoo.com/news/rssindex",
+        "category": "economy",
+        "active": true
+    },
+    {
+        "url": "https://fortune.com/feed",
+        "category": "economy",
+        "active": true
+    },
+    {
+        "url": "https://www.forbes.com/business/feed/",
+        "category": "economy",
+        "active": true
+    },
+    {
+        "url": "https://www.investing.com/rss/news.rss",
+        "category": "economy",
+        "active": true
+    },
+    {
+        "url": "https://www.cnbc.com/id/100727362/device/rss/rss.html",
+        "category": "world",
+        "active": true
+    },
+    {
+        "url": "https://www.theguardian.com/world/rss",
+        "category": "world",
+        "active": true
+    },
+    {
+        "url": "http://feeds.bbci.co.uk/news/science_and_environment/rss.xml",
+        "category": "science",
+        "active": true
+    },
+    {
+        "url": "https://rss.nytimes.com/services/xml/rss/nyt/Science.xml",
+        "category": "science",
+        "active": true
+    },
+    {
+        "url": "https://abcnews.com/abcnews/topstories",
+        "category": "world",
+        "active": true
+    }
+]
