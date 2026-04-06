@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import List
-from datetime import datetime
+from datetime import datetime, timezone
+import calendar
 import logging
 import time
 import asyncio
@@ -35,6 +36,20 @@ def _strip_html(text: str) -> str:
     clean = re.sub(r'\s+', ' ', clean).strip()
     return clean
 
+def _enrich_content(article: Article):
+    if article.content and len(article.content) > 200:
+        return article # good enough
+    
+    
+
+def _parse_feedparser_date(parsed_date) -> datetime:
+    if not parsed_date:
+        return None
+    
+    timestamp = calendar.timegm(parsed_date)
+    return datetime.fromtimestamp(timestamp, tz=timezone.utc)
+    
+
 def _parse_entry(fetched: FeedParserDict, entry: FeedParserDict) -> Article | None:
     title = entry.get('title')
     url = entry.get('link')
@@ -47,10 +62,12 @@ def _parse_entry(fetched: FeedParserDict, entry: FeedParserDict) -> Article | No
     
     source = fetched.feed.get('title')
 
-    published_at = (
-        entry.get('published') or 
-        entry.get('updated')
+    published_parsed = (
+        entry.get('published_parsed') or
+        entry.get('updated_parsed')
     )
+
+    published_at = _parse_feedparser_date(published_parsed)
     
     content_list = entry.get('content', [])
 
@@ -79,7 +96,16 @@ def _parse_entry(fetched: FeedParserDict, entry: FeedParserDict) -> Article | No
         content=content,
         author=author,
         tags=tags
-    ) 
+    )
+
+def deduplicate_articles(articles: List[Article]) -> List[Article]:
+    seen_urls = set()
+    unique = []
+    for article in articles:
+        if article.url not in seen_urls:
+            seen_urls.add(article.url)
+            unique.append(article)
+    return unique
 
 class FeedFetcher:
     def __init__(self, max_concurrent: int = 10):
@@ -115,6 +141,9 @@ class FeedFetcher:
 
         for att in range(max_attempts):
             try:
+
+                # domain lock and semaphore only acquired when 
+                # fetching url, prevents starvation
                 async with domain_lock:
                     async with self.semaphore:
                         response = await client.get(url)
@@ -202,9 +231,13 @@ class FeedFetcher:
                     total_articles += num_articles
                 valid_results.append(result)
 
+        all_articles = [a for feed in valid_results for a in feed]
         logger.info(f"Fetched {total_articles} articles from {successful}/{len(urls_to_fetch)} feeds")
         
-        return valid_results
+        all_articles = deduplicate_articles(all_articles)
+        logger.info(f"After deduplication: {len(all_articles)} unique articles")
+
+        return all_articles
 
 def feeds_to_json(feeds_to_add: List[str]):
     feeds = []
@@ -217,7 +250,7 @@ def feeds_to_json(feeds_to_add: List[str]):
         feeds.append(feed_dict)
     
     try:
-        with open('feeds.json', 'a') as json_file:
+        with open('feeds.json', 'a', encoding='utf-8') as json_file:
             json.dump(feeds, json_file, indent=4)
     except FileNotFoundError as fe:
         raise fe
@@ -228,7 +261,8 @@ def json_to_feeds(json_file: str) -> List[str]:
             feeds = json.load(jf)
             feed_urls = []
             for feed in feeds:
-                feed_urls.append(feed['url'])
+                if feed['active']:
+                    feed_urls.append(feed['url'])
             return feed_urls
     except FileNotFoundError as fe:
         raise fe
@@ -246,6 +280,6 @@ if __name__ == "__main__":
         print(f"{'='*30} BEGIN RESULT {result[0].source} {'='*30}")
         for article in result:
             print(f"{'-'*30} BEGIN ARTICLE {article.title} {'-'*30}")
-            print(article.content)
+            print(article.published_at)
 
     print(f"Time for concurrent fetching: {(end - start):.2f}")
