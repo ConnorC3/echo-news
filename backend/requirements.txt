@@ -1,2 +1,5 @@
 feedparser
 httpx
+asyncpg
+python-dotenv
+pytest
