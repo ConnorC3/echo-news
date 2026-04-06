@@ -1,3 +1,6 @@
+.env
 venv/
 fetch.log
 __pycache__/
+DEVLOG.md
+.pytest_cache/
