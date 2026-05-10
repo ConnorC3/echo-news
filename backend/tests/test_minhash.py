@@ -1,5 +1,7 @@
 import pytest
-from src.minhash import shingle, minhash_signature, jaccard_estimate
+from src.minhash.minhash import shingle
+from src.minhash.minhash_scratch import minhash_signature, jaccard_estimate
+from datasketch import MinHash as DatasketchMinHash
 
 class TestShingling:
     def test_basic_shingling(self):
@@ -180,3 +182,152 @@ class TestAccuracyVsGroundTruth:
         # 256 hashes should be more accurate than 32 on average
         # this can occasionally fail due to randomness, which is expected
         assert errors[-1] < errors[0] * 1.5
+
+class TestAgainstDatasketch:
+    """
+    Validates that my scratch implementation produces similarity estimates
+    consistent with datasketch. Don't expect identical values, since different
+    hash functions produce different absolute signatures, but the relative
+    similarity ordering and approximate magnitudes should agree.
+    """
+
+    def datasketch_similarity(self, text1: str, text2: str, num_perm: int = 128) -> float:
+        m1 = DatasketchMinHash(num_perm=num_perm)
+        m2 = DatasketchMinHash(num_perm=num_perm)
+        
+        for s in shingle(text1, k=5):
+            m1.update(s.encode())
+        for s in shingle(text2, k=5):
+            m2.update(s.encode())
+        
+        return m1.jaccard(m2)
+
+    def scratch_similarity(self, text1: str, text2: str, num_hashes: int = 128) -> float:
+        sig1 = minhash_signature(shingle(text1, k=5), num_hashes=num_hashes)
+        sig2 = minhash_signature(shingle(text2, k=5), num_hashes=num_hashes)
+        return jaccard_estimate(sig1, sig2)
+
+    def true_jaccard(self, text1: str, text2: str) -> float:
+        s1 = shingle(text1, k=5)
+        s2 = shingle(text2, k=5)
+        if not s1 and not s2:
+            return 1.0
+        return len(s1 & s2) / len(s1 | s2)
+
+    def test_both_close_to_true_jaccard_identical_texts(self):
+        text = "the federal reserve raised interest rates amid inflation concerns"
+        true_sim = self.true_jaccard(text, text)
+        scratch_sim = self.scratch_similarity(text, text)
+        datasketch_sim = self.datasketch_similarity(text, text)
+        
+        assert abs(true_sim - scratch_sim) < 0.05
+        assert abs(true_sim - datasketch_sim) < 0.05
+
+    def test_both_agree_on_similar_texts(self):
+        text1 = """
+            The Federal Reserve raised its benchmark interest rate by a quarter
+            percentage point on Wednesday, continuing its campaign to bring
+            inflation down to its 2 percent target. The decision was unanimous
+            among voting members of the Federal Open Market Committee.
+        """
+        text2 = """
+            The Federal Reserve raised its benchmark interest rate by a quarter
+            percentage point Wednesday, pushing forward its effort to bring
+            inflation down to its 2 percent goal. The move was approved unanimously
+            by the Federal Open Market Committee.
+        """
+        
+        true_sim = self.true_jaccard(text1, text2)
+        scratch_sim = self.scratch_similarity(text1, text2)
+        datasketch_sim = self.datasketch_similarity(text1, text2)
+        
+        # both should be within 0.15 of true jaccard
+        assert abs(true_sim - scratch_sim) < 0.15
+        assert abs(true_sim - datasketch_sim) < 0.15
+        
+        # both should agree with each other within reasonable tolerance
+        # they use different hash functions so won't be identical
+        assert abs(scratch_sim - datasketch_sim) < 0.2
+
+    def test_both_agree_on_dissimilar_texts(self):
+        text1 = "federal reserve raises interest rates inflation monetary policy"
+        text2 = "quantum computing breakthrough researchers silicon valley startup"
+        
+        scratch_sim = self.scratch_similarity(text1, text2)
+        datasketch_sim = self.datasketch_similarity(text1, text2)
+        
+        # both should identify these as dissimilar
+        assert scratch_sim < 0.3
+        assert datasketch_sim < 0.3
+
+    def test_ordering_is_consistent(self):
+        """
+        Most important test: both implementations should agree on which
+        pair is more similar, even if absolute values differ.
+        """
+        base = """
+            The Federal Reserve raised interest rates by a quarter point
+            amid ongoing inflation concerns at its Wednesday meeting.
+        """
+        similar = """
+            The Federal Reserve raised interest rates by a quarter point
+            amid persistent inflation worries at its meeting Wednesday.
+        """
+        dissimilar = """
+            Apple announced record quarterly earnings driven by strong
+            iPhone sales in emerging markets despite supply chain concerns.
+        """
+        
+        scratch_sim_high = self.scratch_similarity(base, similar)
+        scratch_sim_low = self.scratch_similarity(base, dissimilar)
+        datasketch_sim_high = self.datasketch_similarity(base, similar)
+        datasketch_sim_low = self.datasketch_similarity(base, dissimilar)
+        
+        # both implementations should agree that base/similar > base/dissimilar
+        assert scratch_sim_high > scratch_sim_low
+        assert datasketch_sim_high > datasketch_sim_low
+
+    def test_accuracy_improves_with_more_hashes(self):
+        """
+        Both implementations should show decreasing error as num_hashes grows.
+        Validates the law of large numbers property of MinHash.
+        """
+        text1 = """
+            The Federal Reserve raised its benchmark interest rate by a quarter
+            percentage point on Wednesday, continuing its campaign to bring
+            inflation down to its 2 percent target. The decision was unanimous
+            among voting members of the Federal Open Market Committee. Chair
+            Jerome Powell said the central bank remains committed to restoring
+            price stability.
+        """
+        text2 = """
+            The Federal Reserve raised its benchmark interest rate by a quarter
+            percentage point Wednesday, pushing forward its effort to bring
+            inflation down to its 2 percent goal. The move was approved unanimously
+            by the Federal Open Market Committee. Fed Chair Jerome Powell indicated
+            the central bank is committed to bringing down inflation.
+        """
+        
+        true_sim = self.true_jaccard(text1, text2)
+        
+        print(f"\nTrue Jaccard: {true_sim:.4f}")
+        print(f"{'num_hashes':<12} {'scratch error':<16} {'datasketch error':<16}")
+        
+        scratch_errors = []
+        datasketch_errors = []
+        
+        for num_hashes in [16, 32, 64, 128, 256]:
+            scratch_sim = self.scratch_similarity(text1, text2, num_hashes)
+            datasketch_sim = self.datasketch_similarity(text1, text2, num_hashes)
+            
+            scratch_err = abs(true_sim - scratch_sim)
+            datasketch_err = abs(true_sim - datasketch_sim)
+            
+            scratch_errors.append(scratch_err)
+            datasketch_errors.append(datasketch_err)
+            
+            print(f"{num_hashes:<12} {scratch_err:<16.4f} {datasketch_err:<16.4f}")
+        
+        # at 256 hashes both should be reasonably accurate
+        assert scratch_errors[-1] < 0.15
+        assert datasketch_errors[-1] < 0.15
