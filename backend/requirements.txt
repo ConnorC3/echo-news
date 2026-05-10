@@ -3,3 +3,5 @@ httpx
 asyncpg
 python-dotenv
 pytest
+datasketch
+trafilatura
